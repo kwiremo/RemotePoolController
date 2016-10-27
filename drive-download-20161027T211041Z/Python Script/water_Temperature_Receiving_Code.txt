@@ -1,0 +1,74 @@
+#Rene Moise Kwibuka & Christian Wagner
+#This document receives water temperature and saves it in the database.
+
+
+import serial, time, datetime, sys, math
+from xbee import XBee
+import MySQLdb as mdb
+
+SERIALPORT = "/dev/ttyAMA0"    # the com/serial port the XBee is connected to, the pi GPIO should always be ttyAMA0
+BAUDRATE = 9600      # the baud rate we talk to the xbee
+
+ser = serial.Serial(SERIALPORT, BAUDRATE)
+
+xbee = XBee(ser)
+
+adjustment_value = .97
+
+# Converting the temperature data
+def get_temp(data, format="C"):
+    #iterate over data elemetns
+    readings = []
+    for item in data:
+        readings.append(item.get('adc-1'))
+
+    #Average data
+    volt_average = sum(readings)/float(len(readings))
+
+    R0 = 10000.0 #Resistance of thermistor
+    t0 = 273.15 # 0 deg C in K
+    aCoef = .001129148
+    bCoef = .000234125
+    cCoef = .0000000876741
+    # Calculating temp
+
+    #Steinhart-Hart equation
+    Temp = math.log(R0*((1024.0/volt_average)-1))
+    T = 1/(aCoef + (bCoef + (cCoef *Temp*Temp))*Temp)
+    T = T - t0 #Converting from Kelvin to Celsius
+    
+    return T
+    
+    
+print 'Starting Up Tempature Monitor'
+# Continuously read and print packets
+#while True:
+try:
+	#reading the recieved data
+	response = xbee.wait_read_frame()
+	#print response
+	tempature = get_temp(response['samples'], format ="C")
+	print 'The temperature is: {0:.2f} C'.format(tempature)
+	try:
+		pi_temp = tempature
+		con = mdb.connect('localhost', \
+						  'admin', \
+						  'Cwagsm', \
+						  'measurements');
+		cur = con.cursor()
+		cur.execute("""INSERT INTO water_temp(temp) \
+				   VALUES(%s)""", (pi_temp))
+		con.commit()
+
+	except mdb.Error, e:
+		con.rollback()
+		print "Error %d: %s" % (e.args[0],e.args[1])
+		sys.exit(1)
+
+	finally:
+		if con:
+			con.close()
+			
+except KeyboardInterrupt:
+	#break
+	ser.close()

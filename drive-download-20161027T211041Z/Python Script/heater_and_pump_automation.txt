@@ -1,0 +1,235 @@
+#Rene Moise Kwibuka & Christian Wagner
+#This code automates the heater and the pump.
+
+
+# import libraries
+import MySQLdb		
+import datetime
+#from datetime import datetime
+from datetime import timedelta
+import time
+import RPi.GPIO as GPIO
+
+#Define relays pin.
+relay1 = 18
+relay2 = 25
+
+# Pin Setup:
+GPIO.setmode(GPIO.BCM) # Broadcom pin-numbering scheme
+GPIO.setup(relay1, GPIO.OUT) # LED pin set as output
+GPIO.setup(relay2, GPIO.OUT) # LED pin set as output
+
+
+# Open setDateUser database connection
+db = MySQLdb.connect("localhost","admin","Cwagsm","setDateUser" )
+
+# prepare a cursor object using cursor() method
+cursor = db.cursor()
+
+# execute SQL query using execute() method.
+cursor.execute("SELECT  id, date FROM dateRecords ORDER by id DESC LIMIT 1")
+
+# Fetch a single row using fetchone() method.
+onTimeDiff = cursor.fetchone()[1];
+onTime = (onTimeDiff.strftime("%Y-%m-%d %H:%M"));		#Run the Pump
+
+cursor.execute("SELECT  id, date_End FROM dateRecords ORDER by id DESC LIMIT 1")
+offTimeDiff = cursor.fetchone()[1];
+offTime = (offTimeDiff.strftime("%Y-%m-%d %H:%M")); 	#Turn off the pump
+
+cursor.execute("SELECT  id, stopDate FROM dateRecords ORDER by id DESC LIMIT 1")
+stopDate = (cursor.fetchone()[1].strftime("%Y-%m-%d %H:%M")); 	#Stop the automation
+
+today = (datetime.datetime.now().strftime("%Y-%m-%d %H:%M"));	#Today's date
+
+cursor.execute("SELECT  id, frequency FROM dateRecords ORDER by id DESC LIMIT 1")
+frequency = (cursor.fetchone())[1]; 	#Get the frequency.
+
+cursor.execute("SELECT  id, eqToControl FROM dateRecords ORDER by id DESC LIMIT 1")
+eqToControl = (cursor.fetchone())[1]; 	#Get the frequency.
+
+
+duration = offTimeDiff - onTimeDiff;
+#datetime.datetime.strptime(duration, "%Y-%m-%d %H:%M")
+#duration = duration.datetime.timestamp();
+#print int(str(duration));
+#duration =  (duration.strftime("%H:%M"));
+
+   
+db.close();		#Close setDateUser connection.
+
+if frequency == " 1 week":
+	print "yes"
+else:
+	print "no";
+	
+print onTime;
+print offTime;
+print stopDate;
+print today;
+
+
+
+# Open equStatus database connection
+db = MySQLdb.connect("localhost","admin","Cwagsm","equStatus" )
+
+# prepare a cursor object using cursor() method
+cursor = db.cursor()
+
+
+if onTime == today and today <= stopDate:
+	
+    if eqToControl == 0:
+		 print "The pump is running from automatic configuration"
+		 GPIO.output(relay1, GPIO.HIGH)	 
+		 # execute SQL query using execute() method.
+		 cursor.execute("""INSERT INTO pump (running) VALUES (%s)""", (1))
+		 db.commit()
+		 db.close();
+    elif eqToControl == 1:
+		 print "The pump is running from automatic configuration"
+		 GPIO.output(relay1, GPIO.HIGH)	 
+		 # execute SQL query using execute() method.
+		 cursor.execute("""INSERT INTO pump (running) VALUES (%s)""", (1))
+		 #db.commit()
+		 
+		 print "The heater is running from automatic configuration"
+		 GPIO.output(relay2, GPIO.HIGH)	 
+		 # execute SQL query using execute() method.
+		 cursor.execute("""INSERT INTO heater (running) VALUES (%s)""", (1))
+		 db.commit()
+		 db.close();
+	
+elif offTime == today and today <= stopDate:
+	
+	if eqToControl == 0:
+		 print "The pump was turned off from automatic configuration"
+		 GPIO.output(relay1, GPIO.LOW)
+		 # execute SQL query using execute() method.
+		 cursor.execute("""INSERT INTO pump (running) VALUES (%s)""", (0))
+		 db.commit()
+		 db.close()
+		 onTime = datetime.datetime.strptime(onTime, "%Y-%m-%d %H:%M")
+		 if frequency == " 1 week":
+			 onTime = onTime + timedelta(weeks = 1);
+			 offTime = onTime + duration;
+			 print offTime
+		 elif frequency == " 1 day":
+			 onTime = onTime + timedelta(days = 1);
+			 offTime = onTime + duration;
+			 print offTime
+				 
+		 elif frequency == " 2 min":
+			 onTime = onTime + timedelta(minutes = 2);
+			 offTime = onTime + duration;
+			 print offTime
+		 else:
+				 print "nothing";
+			 
+		 # Open setDateUser database connection
+		 db = MySQLdb.connect("localhost","admin","Cwagsm","setDateUser" )
+
+		 # prepare a cursor object using cursor() method
+		 cursor = db.cursor()
+		 cursor.execute("""INSERT INTO dateRecords (date, date_End, stopDate, eqToControl) VALUES (%s,%s,%s,%s)""", (onTime, offTime, stopDate, eqToControl))
+		 
+		 db.commit()
+		 db.close()
+     
+	elif eqToControl == 1:
+		 print "The pump was turned off from automatic configuration"
+		 GPIO.output(relay1, GPIO.LOW)
+		 # execute SQL query using execute() method.
+		 cursor.execute("""INSERT INTO pump (running) VALUES (%s)""", (0))
+		 
+		 
+		 print "The heater was turned off from automatic configuration"
+		 GPIO.output(relay2, GPIO.LOW)
+		 # execute SQL query using execute() method.
+		 cursor.execute("""INSERT INTO heater (running) VALUES (%s)""", (0))
+		 db.commit()
+		 db.close()
+		 onTime = datetime.datetime.strptime(onTime, "%Y-%m-%d %H:%M")
+		 if frequency == " 1 week":
+			 onTime = onTime + timedelta(weeks = 1);
+			 offTime = onTime + duration;
+			 print offTime
+		 elif frequency == " 1 day":
+			 onTime = onTime + timedelta(days = 1);
+			 offTime = onTime + duration;
+			 print offTime
+				 
+		 elif frequency == " 2 min":
+			 onTime = onTime + timedelta(minutes = 2);
+			 offTime = onTime + duration;
+			 print offTime
+		 else:
+				 print "nothing";
+			 
+		 # Open setDateUser database connection
+		 db = MySQLdb.connect("localhost","admin","Cwagsm","setDateUser" )
+
+		 # prepare a cursor object using cursor() method
+		 cursor = db.cursor()
+		 cursor.execute("""INSERT INTO dateRecords (date, date_End, stopDate, eqToControl) VALUES (%s,%s,%s,%s)""", (onTime, offTime, stopDate, eqToControl))
+		 
+		 db.commit()
+		 db.close()
+     
+	
+else:
+	print "Do nothing or turn off the pump."
+
+# THis part of the code checks to see if the heater is running and if the temperature desired has been reached.
+
+# Get if it is running first.
+# Open database connection
+db = MySQLdb.connect("localhost","admin","Cwagsm","equStatus" )
+
+# prepare a cursor object using cursor() method
+cursor = db.cursor()
+
+# execute SQL query using execute() method.
+cursor.execute("SELECT  running FROM heater ORDER by date DESC LIMIT 1")
+
+heaterStatus = cursor.fetchone()[0];
+db.close();
+# Get the temperature desired by the user.
+# Open database connection
+db = MySQLdb.connect("localhost","admin","Cwagsm","preferences" )
+
+# prepare a cursor object using cursor() method
+cursor = db.cursor()
+
+# execute SQL query using execute() method.
+cursor.execute("SELECT  temperature FROM desiredTemp ORDER by date DESC LIMIT 1")
+
+desiredTemp = cursor.fetchone()[0];
+ 
+# Get the current temperature of the water
+# Open database connection
+db = MySQLdb.connect("localhost","admin","Cwagsm","measurements" )
+
+# prepare a cursor object using cursor() method
+cursor = db.cursor()
+
+# execute SQL query using execute() method.
+cursor.execute("SELECT  temp FROM water_temp ORDER by date DESC LIMIT 1")
+
+currentTemp = cursor.fetchone()[0];
+
+
+# disconnect from server
+db.close()
+
+
+
+if heaterStatus == 1 and currentTemp < desiredTemp:
+	GPIO.output(relay2, GPIO.HIGH);
+	print desiredTemp
+	print currentTemp
+	print "The heater is actually running.";
+
+else:
+	GPIO.output(relay2, GPIO.LOW);
+	print "The heater is off";
